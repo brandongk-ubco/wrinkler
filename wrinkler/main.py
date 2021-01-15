@@ -5,6 +5,8 @@ from albumentations.pytorch import ToTensorV2
 from datasets.WrinklerDataset import WrinklerDataset
 from datasets.AugmentedDataset import DatasetAugmenter
 import matplotlib
+from matplotlib import pyplot as plt
+import numpy as np
 import albumentations as A
 import sys
 
@@ -22,11 +24,11 @@ class Segmenter(pl.LightningModule):
         self.optimizer = self.get_optimizer()
 
     def get_model(self):
-        return smp.Unet(encoder_name="efficientnet-b5",
-                        encoder_weights="imagenet",
-                        in_channels=3,
-                        classes=3,
-                        activation='softmax')
+        return smp.UnetPlusPlus(encoder_name="efficientnet-b2",
+                                encoder_weights="imagenet",
+                                in_channels=3,
+                                classes=4,
+                                activation='softmax2d')
 
     def get_loss(self):
         return lambda y_hat, y: smp.losses.DiceLoss(
@@ -48,10 +50,39 @@ class Segmenter(pl.LightningModule):
         y_hat = self.model(x)
         loss = self.loss(y_hat, y)
         self.log("val_loss", loss, prog_bar=True)
+
+        imgs = x.cpu()
+        predicted_masks = y_hat.cpu()
+        masks = y.cpu()
+        for i in range(imgs.shape[0]):
+            img = imgs[i, :, :, :].numpy()
+
+            mask = masks[i, :, :, :].numpy()
+            mask_img = np.zeros((img.shape[1], img.shape[2]), dtype=np.uint8)
+            mask_img[mask[1, :, :] == 1] = 50
+            mask_img[mask[2, :, :] == 1] = 100
+            mask_img[mask[3, :, :] == 1] = 200
+
+            predicted_mask = predicted_masks[i, :, :, :].numpy()
+            predicted_mask_img = np.zeros((img.shape[1], img.shape[2]),
+                                          dtype=np.uint8)
+            predicted_mask_img[predicted_mask[1, :, :] >= 0.9] = 50
+            predicted_mask_img[predicted_mask[2, :, :] >= 0.9] = 100
+            predicted_mask_img[predicted_mask[3, :, :] >= 0.9] = 200
+
+            fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+
+            ax1.imshow(img.swapaxes(0, 2).swapaxes(0, 1))
+            ax2.imshow(mask_img)
+            ax3.imshow(predicted_mask_img)
+
+            plt.savefig("{}_{}.png".format(batch_idx, i))
+            plt.close()
+
         return {"val_loss", loss}
 
     def configure_optimizers(self):
-        optimizer = self.optimizer(self.parameters(), lr=1e-2)
+        optimizer = self.optimizer(self.parameters(), lr=1e-3)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                                                patience=40,
                                                                min_lr=1e-5,
@@ -64,22 +95,22 @@ class Segmenter(pl.LightningModule):
         }
 
 
-if __name__ == '__main__':
-
+def get_dataloaders():
     train_data = WrinklerDataset(datapath, split="train")
     val_data = WrinklerDataset(datapath, split="val")
-    batch_size = 10
+    batch_size = 4
 
-    image_size = 512
+    image_height = 1024
+    image_width = 1024
 
     train_transform = A.Compose([
-        A.PadIfNeeded(min_height=image_size,
-                      min_width=image_size,
+        A.PadIfNeeded(min_height=image_height,
+                      min_width=image_width,
                       always_apply=True,
                       border_mode=0),
         A.CropNonEmptyMaskIfExists(
-            image_size,
-            image_size,
+            image_height,
+            image_width,
             always_apply=True,
         ),
         A.HorizontalFlip(p=0.5),
@@ -87,11 +118,11 @@ if __name__ == '__main__':
         ToTensorV2()
     ])
     val_transform = A.Compose([
-        A.PadIfNeeded(min_height=image_size,
-                      min_width=image_size,
+        A.PadIfNeeded(min_height=image_height,
+                      min_width=image_width,
                       always_apply=True,
                       border_mode=0),
-        A.CropNonEmptyMaskIfExists(image_size, image_size),
+        A.CropNonEmptyMaskIfExists(image_height, image_width),
         ToTensorV2()
     ])
 
@@ -107,6 +138,13 @@ if __name__ == '__main__':
                                              batch_size=batch_size,
                                              num_workers=16,
                                              shuffle=False)
+
+    return train_loader, val_loader
+
+
+if __name__ == '__main__':
+
+    train_loader, val_loader = get_dataloaders()
 
     callbacks = [
         pl.callbacks.EarlyStopping('val_loss', patience=80),

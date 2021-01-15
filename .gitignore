@@ -1,3 +1,5 @@
+*.png
+
 tmp.py
 image.sif
 *logs/

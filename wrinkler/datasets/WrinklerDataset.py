@@ -1,7 +1,6 @@
 import glob
 import torch
 from torch.utils.data import Dataset
-from .AugmentedDataset import AugmentedDataset
 import os
 import random
 from PIL import Image
@@ -65,9 +64,6 @@ class WrinklerDataset(Dataset):
 
         for i, (clazz, value) in enumerate(self.classes.items()):
             one_hot_mask[:, :, i][mask == value] = 1
-
-        # Remove the Background
-        one_hot_mask = one_hot_mask[:, :, 1:]
 
         return image_name, image, one_hot_mask
 
