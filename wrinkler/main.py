@@ -25,11 +25,14 @@ class Segmenter(pl.LightningModule):
         return smp.Unet(encoder_name="efficientnet-b5",
                         encoder_weights="imagenet",
                         in_channels=3,
-                        classes=4,
+                        classes=3,
                         activation='softmax')
 
     def get_loss(self):
-        return smp.utils.losses.BCELoss() + smp.utils.losses.DiceLoss()
+        return lambda y_hat, y: smp.losses.DiceLoss(
+            smp.losses.constants.MULTILABEL_MODE, log_loss=True)(
+                y_hat, y) + smp.losses.FocalLoss(smp.losses.constants.
+                                                 MULTILABEL_MODE)(y_hat, y)
 
     def get_optimizer(self):
         return torch.optim.Adam
