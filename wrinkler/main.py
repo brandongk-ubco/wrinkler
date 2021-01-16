@@ -9,11 +9,14 @@ from matplotlib import pyplot as plt
 import numpy as np
 import albumentations as A
 import sys
+import os
 
 pl.seed_everything(42)
 matplotlib.use('Agg')
 
 datapath = "/mnt/d/work/datasets/wrinkler/"
+patience = 10
+batch_size = 2
 
 
 class Segmenter(pl.LightningModule):
@@ -24,17 +27,15 @@ class Segmenter(pl.LightningModule):
         self.optimizer = self.get_optimizer()
 
     def get_model(self):
-        return smp.UnetPlusPlus(encoder_name="efficientnet-b2",
-                                encoder_weights="imagenet",
-                                in_channels=3,
-                                classes=4,
-                                activation='softmax2d')
+        return smp.Unet(encoder_name="efficientnet-b0",
+                        encoder_weights="imagenet",
+                        in_channels=3,
+                        classes=4,
+                        activation='softmax2d')
 
     def get_loss(self):
-        return lambda y_hat, y: smp.losses.DiceLoss(
-            smp.losses.constants.MULTILABEL_MODE, log_loss=True)(
-                y_hat, y) + smp.losses.FocalLoss(smp.losses.constants.
-                                                 MULTILABEL_MODE)(y_hat, y)
+        return lambda y_hat, y: smp.losses.DiceLoss("multilabel")(
+            y_hat, y) + smp.losses.FocalLoss("multilabel")(y_hat, y)
 
     def get_optimizer(self):
         return torch.optim.Adam
@@ -51,9 +52,9 @@ class Segmenter(pl.LightningModule):
         loss = self.loss(y_hat, y)
         self.log("val_loss", loss, prog_bar=True)
 
-        imgs = x.cpu()
-        predicted_masks = y_hat.cpu()
-        masks = y.cpu()
+        imgs = x.clone().detach().cpu()
+        predicted_masks = y_hat.clone().detach().cpu()
+        masks = y.clone().detach().cpu()
         for i in range(imgs.shape[0]):
             img = imgs[i, :, :, :].numpy()
 
@@ -66,9 +67,9 @@ class Segmenter(pl.LightningModule):
             predicted_mask = predicted_masks[i, :, :, :].numpy()
             predicted_mask_img = np.zeros((img.shape[1], img.shape[2]),
                                           dtype=np.uint8)
-            predicted_mask_img[predicted_mask[1, :, :] >= 0.9] = 50
-            predicted_mask_img[predicted_mask[2, :, :] >= 0.9] = 100
-            predicted_mask_img[predicted_mask[3, :, :] >= 0.9] = 200
+            predicted_mask_img[predicted_mask[1, :, :] > 0.5] = 50
+            predicted_mask_img[predicted_mask[2, :, :] > 0.5] = 100
+            predicted_mask_img[predicted_mask[3, :, :] > 0.5] = 200
 
             fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
 
@@ -76,17 +77,17 @@ class Segmenter(pl.LightningModule):
             ax2.imshow(mask_img)
             ax3.imshow(predicted_mask_img)
 
-            plt.savefig("{}_{}.png".format(batch_idx, i))
+            plt.savefig(
+                os.path.join(self.logger.log_dir,
+                             "{}_{}.png".format(batch_idx, i)))
             plt.close()
 
         return {"val_loss", loss}
 
     def configure_optimizers(self):
         optimizer = self.optimizer(self.parameters(), lr=1e-3)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
-                                                               patience=40,
-                                                               min_lr=1e-5,
-                                                               verbose=True)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, patience=patience, min_lr=1e-5, verbose=True)
 
         return {
             "optimizer": optimizer,
@@ -98,10 +99,9 @@ class Segmenter(pl.LightningModule):
 def get_dataloaders():
     train_data = WrinklerDataset(datapath, split="train")
     val_data = WrinklerDataset(datapath, split="val")
-    batch_size = 4
 
-    image_height = 1024
-    image_width = 1024
+    image_height = 1792
+    image_width = 2048
 
     train_transform = A.Compose([
         A.PadIfNeeded(min_height=image_height,
@@ -131,12 +131,12 @@ def get_dataloaders():
 
     train_loader = torch.utils.data.DataLoader(train_data,
                                                batch_size=batch_size,
-                                               num_workers=16,
+                                               num_workers=8,
                                                shuffle=True)
 
     val_loader = torch.utils.data.DataLoader(val_data,
                                              batch_size=batch_size,
-                                             num_workers=16,
+                                             num_workers=8,
                                              shuffle=False)
 
     return train_loader, val_loader
@@ -147,7 +147,7 @@ if __name__ == '__main__':
     train_loader, val_loader = get_dataloaders()
 
     callbacks = [
-        pl.callbacks.EarlyStopping('val_loss', patience=80),
+        pl.callbacks.EarlyStopping('val_loss', patience=2 * patience),
         pl.callbacks.LearningRateMonitor(logging_interval='epoch')
     ]
 
