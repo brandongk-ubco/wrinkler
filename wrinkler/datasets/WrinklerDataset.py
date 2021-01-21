@@ -19,9 +19,11 @@ class WrinklerDataset(Dataset):
                  root_dir,
                  test_percent=15.,
                  val_percent=5.,
-                 split="train"):
+                 split="train",
+                 use_cache=True):
         self.root_dir = root_dir
         self.split = split
+        self.use_cache = use_cache
 
         images = [
             os.path.basename(i)
@@ -47,7 +49,8 @@ class WrinklerDataset(Dataset):
         elif split == "test":
             self.images = test_images
 
-        self.populate_cache()
+        if self.use_cache:
+            self.populate_cache()
 
     def load_image(self, image_name):
         image_path = os.path.join(self.root_dir, "Images", image_name)
@@ -79,4 +82,8 @@ class WrinklerDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        return self.cache[self.images[idx]]
+        if self.use_cache:
+            return self.cache[self.images[idx]]
+        else:
+            image_name, image, mask = self.load_image(self.images[idx])
+            return (image, mask)

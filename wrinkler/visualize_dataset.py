@@ -6,7 +6,8 @@ from main import get_dataloaders
 matplotlib.use('Agg')
 
 if __name__ == '__main__':
-    train_loader, val_loader = get_dataloaders()
+    train_loader, val_loader = get_dataloaders(
+        "/mnt/d/work/datasets/wrinkler/")
 
     for imgs, masks in train_loader:
         for i in range(imgs.shape[0]):
