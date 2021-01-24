@@ -7,19 +7,22 @@ from matplotlib import pyplot as plt
 
 
 class Segmenter(pl.LightningModule):
-    def __init__(self, patience=10):
+    def __init__(self, num_classes, patience=10):
         super().__init__()
-        self.model = self.get_model()
         self.loss = self.get_loss()
         self.optimizer = self.get_optimizer()
         self.patience = 10
+        self.num_classes = num_classes + 1
+        self.intensity = 255 // self.num_classes
+        self.model = self.get_model()
+        self.batches_to_write = 2
 
     def get_model(self):
-        return smp.DeepLabV3Plus(encoder_name="efficientnet-b0",
-                                 encoder_weights="imagenet",
-                                 in_channels=3,
-                                 classes=4,
-                                 activation='softmax2d')
+        return smp.Unet(encoder_name="efficientnet-b0",
+                        encoder_weights="imagenet",
+                        in_channels=3,
+                        classes=self.num_classes,
+                        activation='softmax2d')
 
     def get_loss(self):
         return lambda y_hat, y: smp.losses.DiceLoss("multilabel")(
@@ -57,6 +60,9 @@ class Segmenter(pl.LightningModule):
         }
 
     def write_predictions(self, x, y, y_hat, batch_idx):
+        if batch_idx > self.batches_to_write:
+            return
+
         imgs = x.clone().detach().cpu()
         predicted_masks = y_hat.clone().detach().cpu()
         masks = y.clone().detach().cpu()
@@ -65,16 +71,15 @@ class Segmenter(pl.LightningModule):
 
             mask = masks[i, :, :, :].numpy()
             mask_img = np.zeros((img.shape[1], img.shape[2]), dtype=np.uint8)
-            mask_img[mask[1, :, :] == 1] = 50
-            mask_img[mask[2, :, :] == 1] = 100
-            mask_img[mask[3, :, :] == 1] = 200
+            for j in range(1, self.num_classes):
+                mask_img[mask[j, :, :] == 1] = self.intensity * j
 
             predicted_mask = predicted_masks[i, :, :, :].numpy()
             predicted_mask_img = np.zeros((img.shape[1], img.shape[2]),
                                           dtype=np.uint8)
-            predicted_mask_img[predicted_mask[1, :, :] > 0.5] = 50
-            predicted_mask_img[predicted_mask[2, :, :] > 0.5] = 100
-            predicted_mask_img[predicted_mask[3, :, :] > 0.5] = 200
+            for j in range(1, self.num_classes):
+                predicted_mask_img[
+                    predicted_mask[j, :, :] > 0.5] = self.intensity * j
 
             fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
 

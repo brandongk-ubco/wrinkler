@@ -17,3 +17,4 @@ dependencies:
     - albumentations==0.5.2
     - flake8==3.8.4
     - yapf==0.30.0
+    - scikit_learn==0.24.1

@@ -6,6 +6,10 @@ import random
 from PIL import Image
 import numpy as np
 from p_tqdm import p_uimap
+from datasets.AugmentedDataset import DatasetAugmenter
+
+image_height = 1792
+image_width = 2048
 
 
 class WrinklerDataset(Dataset):
@@ -87,3 +91,34 @@ class WrinklerDataset(Dataset):
         else:
             image_name, image, mask = self.load_image(self.images[idx])
             return (image, mask)
+
+
+def get_dataloaders(datapath, augmentations, use_cache=True):
+    train_transform, val_transform, test_transform = augmentations
+
+    train_data = WrinklerDataset(datapath, split="train", use_cache=use_cache)
+    val_data = WrinklerDataset(datapath, split="val", use_cache=use_cache)
+    test_data = WrinklerDataset(datapath, split="test", use_cache=use_cache)
+
+    batch_size = 2
+
+    train_data = DatasetAugmenter(train_data, train_transform)
+    val_data = DatasetAugmenter(val_data, val_transform)
+    test_data = DatasetAugmenter(test_data, test_transform)
+
+    train_loader = torch.utils.data.DataLoader(train_data,
+                                               batch_size=batch_size,
+                                               num_workers=8,
+                                               shuffle=True)
+
+    val_loader = torch.utils.data.DataLoader(val_data,
+                                             batch_size=batch_size,
+                                             num_workers=8,
+                                             shuffle=False)
+
+    test_loader = torch.utils.data.DataLoader(test_data,
+                                              batch_size=1,
+                                              num_workers=8,
+                                              shuffle=False)
+
+    return train_loader, val_loader, test_loader

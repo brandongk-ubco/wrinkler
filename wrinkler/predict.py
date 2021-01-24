@@ -11,8 +11,8 @@ pl.seed_everything(42)
 matplotlib.use('Agg')
 
 datapath = "/mnt/d/work/datasets/wrinkler/"
-model = "/mnt/d/work/repos/wrinkler/lightning_logs/version_10/checkpoints/epoch=17-step=1493.ckpt"
-outdir = "/mnt/d/work/repos/wrinkler/lightning_logs/version_10/predictions/"
+model = "/mnt/d/work/repos/wrinkler/lightning_logs/version_7/checkpoints/epoch=10-step=912.ckpt"
+outdir = "/mnt/d/work/repos/wrinkler/lightning_logs/version_7/predictions/"
 
 os.makedirs(outdir, exist_ok=True)
 

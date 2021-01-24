@@ -9,7 +9,7 @@ pl.seed_everything(42)
 matplotlib.use('Agg')
 
 datapath = "/mnt/d/work/datasets/wrinkler/"
-outdir = "/mnt/d/work/repos/wrinkler/lightning_logs/version_10/predictions/"
+outdir = "/mnt/d/work/repos/wrinkler/lightning_logs/version_7/predictions/"
 
 
 def visualize_prediction(src):
