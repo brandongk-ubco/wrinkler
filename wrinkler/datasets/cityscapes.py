@@ -64,7 +64,7 @@ class CityscapesAugmentedDataset(AugmentedDataset):
         mask = np.array(mask)
 
         label_mask = np.zeros(
-            (len(self.classes) + 1, mask.shape[0], mask.shape[1]),
+            (len(self.classes), mask.shape[0], mask.shape[1]),
             dtype=image.dtype)
 
         for k, v in mapping_20.items():

@@ -12,7 +12,7 @@ class Segmenter(pl.LightningModule):
         self.loss = self.get_loss()
         self.optimizer = self.get_optimizer()
         self.patience = 10
-        self.num_classes = num_classes + 1
+        self.num_classes = num_classes
         self.intensity = 255 // self.num_classes
         self.model = self.get_model()
         self.batches_to_write = 2
@@ -68,18 +68,12 @@ class Segmenter(pl.LightningModule):
         masks = y.clone().detach().cpu()
         for i in range(imgs.shape[0]):
             img = imgs[i, :, :, :].numpy()
-
             mask = masks[i, :, :, :].numpy()
-            mask_img = np.zeros((img.shape[1], img.shape[2]), dtype=np.uint8)
-            for j in range(1, self.num_classes):
-                mask_img[mask[j, :, :] == 1] = self.intensity * j
-
             predicted_mask = predicted_masks[i, :, :, :].numpy()
-            predicted_mask_img = np.zeros((img.shape[1], img.shape[2]),
-                                          dtype=np.uint8)
-            for j in range(1, self.num_classes):
-                predicted_mask_img[
-                    predicted_mask[j, :, :] > 0.5] = self.intensity * j
+
+            mask_img = np.argmax(mask, axis=0) * self.intensity
+            predicted_mask_img = np.argmax(predicted_mask,
+                                           axis=0) * self.intensity
 
             fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
 

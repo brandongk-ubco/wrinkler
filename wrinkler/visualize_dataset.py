@@ -16,9 +16,7 @@ if __name__ == '__main__':
             img = imgs[i, :, :, :].numpy()
             mask = masks[i, :, :, :].numpy()
 
-            mask_img = np.zeros((img.shape[1], img.shape[2]), dtype=np.uint8)
-            for i in range(1, num_classes):
-                mask_img[mask[i, :, :] > 0.5] = intensity * i
+            mask_img = np.argmax(mask, axis=0) * intensity
 
             fig, (ax1, ax2) = plt.subplots(2, 1)
 
