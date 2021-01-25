@@ -7,15 +7,19 @@ from matplotlib import pyplot as plt
 
 
 class Segmenter(pl.LightningModule):
-    def __init__(self, num_classes, patience=10):
+    def __init__(self, dataset, get_augments, patience=10):
         super().__init__()
         self.loss = self.get_loss()
         self.optimizer = self.get_optimizer()
         self.patience = 10
-        self.num_classes = num_classes
-        self.intensity = 255 // self.num_classes
-        self.model = self.get_model()
         self.batches_to_write = 2
+        self.num_classes = dataset.num_classes
+        self.train_data, self.val_data, self.test_data = dataset.get_dataloaders(
+            get_augments(dataset.image_height, dataset.image_width))
+        self.batch_size = dataset.batch_size
+
+        self.model = self.get_model()
+        self.intensity = 255 // self.num_classes
 
     def get_model(self):
         return smp.Unet(encoder_name="efficientnet-b0",
@@ -30,6 +34,18 @@ class Segmenter(pl.LightningModule):
 
     def get_optimizer(self):
         return torch.optim.Adam
+
+    def train_dataloader(self):
+        return torch.utils.data.DataLoader(self.train_data,
+                                           batch_size=self.batch_size,
+                                           num_workers=os.cpu_count() // 2,
+                                           shuffle=True)
+
+    def val_dataloader(self):
+        return torch.utils.data.DataLoader(self.val_data,
+                                           batch_size=self.batch_size,
+                                           num_workers=os.cpu_count() // 2,
+                                           shuffle=False)
 
     def training_step(self, batch, batch_idx):
         x, y = batch
@@ -60,7 +76,12 @@ class Segmenter(pl.LightningModule):
         }
 
     def write_predictions(self, x, y, y_hat, batch_idx):
-        if batch_idx > self.batches_to_write:
+        if batch_idx >= self.batches_to_write:
+            return
+
+        try:
+            self.logger.log_dir
+        except AttributeError:
             return
 
         imgs = x.clone().detach().cpu()

@@ -2,10 +2,11 @@ from .AugmentedDataset import AugmentedDataset
 import torch
 import numpy as np
 import torchvision
-import os
 
 image_height = 1024
 image_width = 2048
+num_classes = 20
+batch_size = 3
 
 mapping_20 = {
     0: 0,
@@ -78,7 +79,7 @@ class CityscapesAugmentedDataset(AugmentedDataset):
         return image, label_mask
 
 
-def get_dataloaders(datapath, augmentations, use_cache=True):
+def get_dataloaders(augmentations, use_cache=True):
     train_transform, val_transform, test_transform = augmentations
     train_data = torchvision.datasets.Cityscapes(cityscapes_folder,
                                                  split='train',
@@ -94,26 +95,9 @@ def get_dataloaders(datapath, augmentations, use_cache=True):
                                                 split='test',
                                                 mode='fine',
                                                 target_type='semantic')
-    batch_size = 3
 
     train_data = CityscapesAugmentedDataset(train_data, train_transform)
     val_data = CityscapesAugmentedDataset(val_data, val_transform)
     test_data = CityscapesAugmentedDataset(test_data, test_transform)
 
-    train_loader = torch.utils.data.DataLoader(train_data,
-                                               batch_size=batch_size,
-                                               num_workers=os.cpu_count() // 2,
-                                               shuffle=True)
-
-    val_loader = torch.utils.data.DataLoader(val_data,
-                                             batch_size=batch_size,
-                                             num_workers=os.cpu_count() // 2,
-                                             shuffle=False)
-
-    test_loader = torch.utils.data.DataLoader(test_data,
-                                              batch_size=1,
-                                              num_workers=os.cpu_count() // 2,
-                                              shuffle=False)
-
-    return train_loader, val_loader, test_loader, len(
-        CityscapesAugmentedDataset.classes)
+    return train_data, val_data, test_data

@@ -10,6 +10,9 @@ from datasets.AugmentedDataset import DatasetAugmenter
 
 image_height = 1792
 image_width = 2048
+batch_size = 2
+
+wrinkler_folder = "/mnt/d/work/datasets/wrinkler"
 
 
 class WrinklerDataset(Dataset):
@@ -20,18 +23,16 @@ class WrinklerDataset(Dataset):
     classes = {"background": 0, "gripper": 50, "wrinkle": 100, "fabric": 200}
 
     def __init__(self,
-                 root_dir,
                  test_percent=15.,
                  val_percent=5.,
                  split="train",
                  use_cache=True):
-        self.root_dir = root_dir
         self.split = split
         self.use_cache = use_cache
 
         images = [
-            os.path.basename(i)
-            for i in glob.glob(os.path.join(self.root_dir, "Images", "*.png"))
+            os.path.basename(i) for i in glob.glob(
+                os.path.join(wrinkler_folder, "Images", "*.png"))
         ]
 
         randomizer = random.Random(42)
@@ -57,8 +58,8 @@ class WrinklerDataset(Dataset):
             self.populate_cache()
 
     def load_image(self, image_name):
-        image_path = os.path.join(self.root_dir, "Images", image_name)
-        mask_path = os.path.join(self.root_dir, "Masks1", image_name)
+        image_path = os.path.join(wrinkler_folder, "Images", image_name)
+        mask_path = os.path.join(wrinkler_folder, "Masks1", image_name)
         image = Image.open(image_path)
         mask = Image.open(mask_path)
 
@@ -100,25 +101,8 @@ def get_dataloaders(datapath, augmentations, use_cache=True):
     val_data = WrinklerDataset(datapath, split="val", use_cache=use_cache)
     test_data = WrinklerDataset(datapath, split="test", use_cache=use_cache)
 
-    batch_size = 2
-
     train_data = DatasetAugmenter(train_data, train_transform)
     val_data = DatasetAugmenter(val_data, val_transform)
     test_data = DatasetAugmenter(test_data, test_transform)
 
-    train_loader = torch.utils.data.DataLoader(train_data,
-                                               batch_size=batch_size,
-                                               num_workers=8,
-                                               shuffle=True)
-
-    val_loader = torch.utils.data.DataLoader(val_data,
-                                             batch_size=batch_size,
-                                             num_workers=8,
-                                             shuffle=False)
-
-    test_loader = torch.utils.data.DataLoader(test_data,
-                                              batch_size=1,
-                                              num_workers=8,
-                                              shuffle=False)
-
-    return train_loader, val_loader, test_loader
+    return train_data, val_data, test_data
